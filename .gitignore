@@ -39,3 +39,9 @@ TAGS
 /GTAGS
 /test/test_setattr
 /build/
+
+/cmake-build-debug/
+CMakeLists.txt
+/.idea/
+libfuse2.iml
+misc.xml

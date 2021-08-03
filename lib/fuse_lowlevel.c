@@ -2602,10 +2602,12 @@ void fuse_session_process_buf_int(struct fuse_session *se,
 	req->ch = ch ? fuse_chan_get(ch) : NULL;
 
 	err = EIO;
+	printf("se->got_init %d\n", se->got_init);
 	if (!se->got_init) {
 		enum fuse_opcode expected;
 
 		expected = se->cuse_data ? CUSE_INIT : FUSE_INIT;
+		printf("in->opcode is %d, expected %d\n", in->opcode, expected);
 		if (in->opcode != expected)
 			goto reply_err;
 	} else if (in->opcode == FUSE_INIT || in->opcode == CUSE_INIT)
@@ -2918,9 +2920,10 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
 	se->conn.max_write = UINT_MAX;
 	se->conn.max_readahead = UINT_MAX;
 
-	/* Parse options */
-	if(fuse_opt_parse(args, se, fuse_ll_opts, NULL) == -1)
-		goto out2;
+    /* Parse options */
+	if(fuse_opt_parse(args, se, fuse_ll_opts, NULL) == -1) {
+        goto out2;
+	}
 	if(se->deny_others) {
 		/* Allowing access only by root is done by instructing
 		 * kernel to allow access by everyone, and then restricting
@@ -2928,8 +2931,9 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
 		 */
 		// We may be adding the option a second time, but
 		// that doesn't hurt.
-		if(fuse_opt_add_arg(args, "-oallow_other") == -1)
-			goto out2;
+		if(fuse_opt_add_arg(args, "-oallow_other") == -1) {
+            goto out2;
+		}
 	}
 	mo = parse_mount_opts(args);
 	if (mo == NULL)
@@ -2945,7 +2949,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
 		for(i = 1; i < args->argc-1; i++)
 			fuse_log(FUSE_LOG_ERR, "%s ", args->argv[i]);
 		fuse_log(FUSE_LOG_ERR, "%s'\n", args->argv[i]);
-		goto out4;
+//		goto out4;
 	}
 
 	if (se->debug)
@@ -2976,7 +2980,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
 
 out5:
 	pthread_mutex_destroy(&se->lock);
-out4:
+//out4:
 	fuse_opt_free_args(args);
 out3:
 	if (mo != NULL)
@@ -2985,6 +2989,60 @@ out2:
 	free(se);
 out1:
 	return NULL;
+}
+
+int fuse_session_remount(struct fuse_session *se, const char *mountpoint, int prev_fd)
+{
+    int fd;
+    printf("Session remount %s\n",mountpoint);
+
+    /*
+     * Make sure file descriptors 0, 1 and 2 are open, otherwise chaos
+     * would ensue.
+     */
+    do {
+        fd = open("/dev/null", O_RDWR);
+        if (fd > 2)
+            close(fd);
+    } while (fd >= 0 && fd <= 2);
+
+    /*
+     * To allow FUSE daemons to run without privileges, the caller may open
+     * /dev/fuse before launching the file system and pass on the file
+     * descriptor by specifying /dev/fd/N as the mount point. Note that the
+     * parent process takes care of performing the mount in this case.
+     */
+    fd = fuse_mnt_parse_fuse_fd(mountpoint);
+    if (fd != -1) {
+        if (fcntl(fd, F_GETFD) == -1) {
+            fuse_log(FUSE_LOG_ERR,
+                     "fuse: Invalid file descriptor /dev/fd/%u\n",
+                     fd);
+            return -1;
+        }
+        se->fd = fd;
+        return 0;
+    }
+
+    /* Open channel */
+//    printf("Opening channel\n");
+//    fd = fuse_kern_mount(mountpoint, se->mo);
+//    if (fd == -1)
+//        return -1;
+//    se->fd = fd;
+//    printf("Opening channel yay\n");
+    se->fd = prev_fd;
+
+    /* Save mountpoint */
+    se->mountpoint = strdup(mountpoint);
+    if (se->mountpoint == NULL)
+        goto error_out;
+
+    return 0;
+
+    error_out:
+    fuse_kern_unmount(mountpoint, fd);
+    return -1;
 }
 
 int fuse_session_mount(struct fuse_session *se, const char *mountpoint)

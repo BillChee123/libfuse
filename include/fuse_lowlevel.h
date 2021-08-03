@@ -1943,6 +1943,8 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
  **/
 int fuse_session_mount(struct fuse_session *se, const char *mountpoint);
 
+int fuse_session_remount(struct fuse_session *se, const char *mountpoint, int fd);
+
 /**
  * Enter a single threaded, blocking event loop.
  *

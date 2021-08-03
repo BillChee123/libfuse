@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/libfuse.iml" filepath="$PROJECT_DIR$/.idea/libfuse.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/libfuse2.iml" filepath="$PROJECT_DIR$/.idea/libfuse2.iml" />
     </modules>
   </component>
 </project>
